@@ -83,6 +83,7 @@ class ChatService:
         vector_store_component: VectorStoreComponent,
         embedding_component: EmbeddingComponent,
         node_store_component: NodeStoreComponent,
+        graph_store_component: GraphStoreComponent,
     ) -> None:
         self.settings = settings
         self.llm_component = llm_component
@@ -90,6 +91,9 @@ class ChatService:
         self.vector_store_component = vector_store_component
         self.storage_context = StorageContext.from_defaults(
             vector_store=vector_store_component.vector_store,
+            graph_store=graph_store_component.graph_store
+            if graph_store_component and graph_store_component.graph_store
+            else None,
             docstore=node_store_component.doc_store,
             index_store=node_store_component.index_store,
         )
@@ -100,6 +104,8 @@ class ChatService:
             embed_model=embedding_component.embedding_model,
             show_progress=True,
         )
+        self.graph_store_component = graph_store_component
+        self.knowledge_graph_index = graph_store_component.graph_store
 
     def _chat_engine(
         self,
@@ -114,6 +120,24 @@ class ChatService:
                 context_filter=context_filter,
                 similarity_top_k=self.settings.rag.similarity_top_k,
             )
+            graph_knowledge_retrevier = self.graph_store_component.get_knowledge_graph(
+                llm=self.llm_component.llm,
+                storage_context=self.storage_context,
+            )
+            retrievers = [
+                r for r in [vector_index_retriever, graph_knowledge_retrevier] if r
+            ]
+            retriever = RouterRetriever.from_defaults(
+                retriever_tools=[
+                    RetrieverTool.from_defaults(retriever) for retriever in retrievers
+                ],
+                llm=self.llm_component.llm,
+                selector=LLMSingleSelector.from_defaults(
+                    llm=self.llm_component.llm
+                ),  # TODO: Could be LLMMultiSelector if needed
+                select_multi=len(retrievers) > 1,
+            )
+
             node_postprocessors = [
                 MetadataReplacementPostProcessor(target_metadata_key="window"),
                 SimilarityPostprocessor(
@@ -129,7 +153,7 @@ class ChatService:
 
             return ContextChatEngine.from_defaults(
                 system_prompt=system_prompt,
-                retriever=vector_index_retriever,
+                retriever=retriever,
                 llm=self.llm_component.llm,  # Takes no effect at the moment
                 node_postprocessors=node_postprocessors,
             )
