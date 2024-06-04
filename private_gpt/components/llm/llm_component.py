@@ -21,6 +21,8 @@ class LLMComponent:
 
     @inject
     def __init__(self, settings: Settings) -> None:
+        global settings_kwargs
+
         llm_mode = settings.llm.mode
         if settings.llm.tokenizer and settings.llm.mode != "mock":
             # Try to download the tokenizer. If it fails, the LLM will still work
@@ -51,15 +53,25 @@ class LLMComponent:
                         "Local dependencies not found, install with `poetry install --extras llms-llama-cpp`"
                     ) from e
 
-                prompt_style = get_prompt_style(settings.llm.prompt_style)
-                settings_kwargs = {
-                    "tfs_z": settings.llamacpp.tfs_z,  # ollama and llama-cpp
-                    "top_k": settings.llamacpp.top_k,  # ollama and llama-cpp
-                    "top_p": settings.llamacpp.top_p,  # ollama and llama-cpp
-                    "repeat_penalty": settings.llamacpp.repeat_penalty,  # ollama llama-cpp
-                    "n_gpu_layers": -1,
-                    "offload_kqv": True,
-                }
+                llm_name = settings.llm.prompt_style
+                prompt_style = get_prompt_style(llm_name)
+                if llm_name == "llama2":
+                    settings_kwargs = {
+                        "tfs_z": settings.llamacpp.tfs_z,  # ollama and llama-cpp
+                        "top_k": settings.llamacpp.top_k,  # ollama and llama-cpp
+                        "top_p": settings.llamacpp.top_p,  # ollama and llama-cpp
+                        "repeat_penalty": settings.llamacpp.repeat_penalty,  # ollama llama-cpp
+                        "n_gpu_layers": -1,
+                        "offload_kqv": True,
+                    }
+                elif llm_name == "llama3":
+                    settings_kwargs = {
+                        "n_gpu_layers": 2,
+                        "n_threads": 2,
+                        "n_ctx": 4096,
+                        "n_batch": 480,
+                        "stop": ["<|eot_id|>", "<|end_of_text|>", "<|end_header_id|>"],
+                    }
                 self.llm = LlamaCPP(
                     model_path=str(models_path / settings.llamacpp.llm_hf_model_file),
                     temperature=settings.llm.temperature,

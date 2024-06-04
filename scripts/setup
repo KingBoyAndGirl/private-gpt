@@ -35,6 +35,7 @@ hf_hub_download(
     cache_dir=models_cache_path,
     local_dir=models_path,
     resume_download=resume_download,
+    token=settings().huggingface.access_token, # add this
 )
 print("LLM model downloaded!")
 
@@ -43,6 +44,7 @@ print(f"Downloading tokenizer {settings().llm.tokenizer}")
 AutoTokenizer.from_pretrained(
     pretrained_model_name_or_path=settings().llm.tokenizer,
     cache_dir=models_cache_path,
+    token=settings().huggingface.access_token, # add this
 )
 print("Tokenizer downloaded!")
 
