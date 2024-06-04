@@ -58,6 +58,7 @@ class BaseIngestComponentWithIndex(BaseIngestComponent, abc.ABC):
         storage_context: StorageContext,
         embed_model: EmbedType,
         transformations: list[TransformComponent],
+        llm: LLM,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -68,6 +69,7 @@ class BaseIngestComponentWithIndex(BaseIngestComponent, abc.ABC):
             threading.Lock()
         )  # Thread lock! Not Multiprocessing lock
         self._index = self._initialize_index()
+        self._knowledge_graph = self._initialize_knowledge_graph(llm)
 
     def _initialize_index(self) -> BaseIndex[IndexDict]:
         """Initialize the index from the storage context."""
@@ -94,8 +96,33 @@ class BaseIngestComponentWithIndex(BaseIngestComponent, abc.ABC):
             index.storage_context.persist(persist_dir=local_data_path)
         return index
 
+    def _initialize_knowledge_graph(
+            self,
+            llm: LLM,
+            max_triplets_per_chunk: int = 10,
+            include_embeddings: bool = True,
+    ) -> KnowledgeGraphIndex:
+        """Initialize the index from the storage context."""
+        index = KnowledgeGraphIndex.from_documents(
+            [],
+            storage_context=self.storage_context,
+            show_progress=self.show_progress,
+            embed_model=self.embed_model,
+            transformations=self.transformations,
+            llm=llm,
+            max_triplets_per_chunk=max_triplets_per_chunk,
+            include_embeddings=include_embeddings,
+        )
+        index.storage_context.persist(persist_dir=local_data_path)
+        return index
+
     def _save_index(self) -> None:
+        logger.debug("Persisting the index")
         self._index.storage_context.persist(persist_dir=local_data_path)
+
+    def _save_knowledge_graph(self) -> None:
+        logger.debug("Persisting the knowledge graph")
+        self._knowledge_graph.storage_context.persist(persist_dir=local_data_path)
 
     def delete(self, doc_id: str) -> None:
         with self._index_thread_lock:
@@ -138,14 +165,34 @@ class SimpleIngestComponent(BaseIngestComponentWithIndex):
     def _save_docs(self, documents: list[Document]) -> list[Document]:
         logger.debug("Transforming count=%s documents into nodes", len(documents))
         with self._index_thread_lock:
-            for document in documents:
-                self._index.insert(document, show_progress=True)
-            logger.debug("Persisting the index and nodes")
-            # persist the index and nodes
-            self._save_index()
-            logger.debug("Persisted the index and nodes")
+
+            logger.debug("Persisting the index and nodes in the vector store")
+            self._save_to_index(documents)
+
+            logger.debug("Persisting the index and nodes in the knowledge graph")
+            self._save_to_knowledge_graph(documents)
+
         return documents
 
+    def _save_to_index(self, documents: list[Document]) -> None:
+        logger.debug("Inserting count=%s documents in the index", len(documents))
+        for document in documents:
+            logger.info("Inserting document=%s in the index", document)
+            self._index.insert(document, show_progress=True)
+        self._save_index()
+        pass
+
+    def _save_to_knowledge_graph(self, documents: list[Document]) -> None:
+        logger.debug(
+            "Inserting count=%s documents in the knowledge graph", len(documents)
+        )
+        for document in [
+            d for d in documents if d.extra_info.get("graph_type", None) is not None
+        ]:
+            logger.info("Inserting document=%s in the knowledge graph", document)
+            logger.info("Document=%s", document.extra_info)
+            self._knowledge_graph.insert(document, show_progress=True)
+        self._save_knowledge_graph()
 
 class BatchIngestComponent(BaseIngestComponentWithIndex):
     """Parallelize the file reading and parsing on multiple CPU core.
@@ -485,6 +532,7 @@ def get_ingestion_component(
     embed_model: EmbedType,
     transformations: list[TransformComponent],
     settings: Settings,
+    llm: LLM,
 ) -> BaseIngestComponent:
     """Get the ingestion component for the given configuration."""
     ingest_mode = settings.embedding.ingest_mode
@@ -494,6 +542,7 @@ def get_ingestion_component(
             embed_model=embed_model,
             transformations=transformations,
             count_workers=settings.embedding.count_workers,
+            llm=llm,
         )
     elif ingest_mode == "parallel":
         return ParallelizedIngestComponent(
@@ -501,6 +550,7 @@ def get_ingestion_component(
             embed_model=embed_model,
             transformations=transformations,
             count_workers=settings.embedding.count_workers,
+            llm=llm,
         )
     elif ingest_mode == "pipeline":
         return PipelineIngestComponent(
@@ -508,10 +558,12 @@ def get_ingestion_component(
             embed_model=embed_model,
             transformations=transformations,
             count_workers=settings.embedding.count_workers,
+            llm=llm,
         )
     else:
         return SimpleIngestComponent(
             storage_context=storage_context,
             embed_model=embed_model,
             transformations=transformations,
+            llm=llm,
         )
