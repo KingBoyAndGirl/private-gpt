@@ -9,6 +9,7 @@ llm:
 
 embedding:
   mode: ollama
+  ingest_mode: simple # 启用 simple，将嵌入和三元组存储在图形存储中。
 
 ollama:
   llm_model: wangshenzhi/llama3-8b-chinese-chat-ollama-q8:latest

@@ -47,6 +47,7 @@ sentence-transformers = {version ="^2.6.1", optional = true}
 # Optional UI
 gradio = {version ="^4.19.2", optional = true}
 whisper = "^1.1.10"
+rdflib = "^7.0.0"
 
 [tool.poetry.extras]
 ui = ["gradio"]
@@ -65,6 +66,7 @@ vector-stores-qdrant = ["llama-index-vector-stores-qdrant"]
 vector-stores-chroma = ["llama-index-vector-stores-chroma"]
 vector-stores-postgres = ["llama-index-vector-stores-postgres"]
 storage-nodestore-postgres = ["llama-index-storage-docstore-postgres","llama-index-storage-index-store-postgres","psycopg2-binary","asyncpg"]
+graph-stores-neo4j = ["llama-index-graph-stores-neo4j"]
 rerank-sentence-transformers = ["torch", "sentence-transformers"]
 
 [tool.poetry.group.dev.dependencies]

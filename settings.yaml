@@ -79,6 +79,9 @@ vectorstore:
 nodestore:
   database: simple
 
+graphstore:
+  database: neo4j
+
 qdrant:
   path: local_data/private_gpt/qdrant
 

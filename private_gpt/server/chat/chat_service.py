@@ -17,6 +17,7 @@ from llama_index.core.types import TokenGen
 from pydantic import BaseModel
 
 from private_gpt.components.embedding.embedding_component import EmbeddingComponent
+from private_gpt.components.graph_store.graph_store_component import GraphStoreComponent
 from private_gpt.components.llm.llm_component import LLMComponent
 from private_gpt.components.node_store.node_store_component import NodeStoreComponent
 from private_gpt.components.vector_store.vector_store_component import (

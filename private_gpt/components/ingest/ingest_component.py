@@ -9,11 +9,13 @@ from pathlib import Path
 from queue import Queue
 from typing import Any
 
+from llama_index.core import KnowledgeGraphIndex
 from llama_index.core.data_structs import IndexDict
 from llama_index.core.embeddings.utils import EmbedType
 from llama_index.core.indices import VectorStoreIndex, load_index_from_storage
 from llama_index.core.indices.base import BaseIndex
 from llama_index.core.ingestion import run_transformations
+from llama_index.core.llms import LLM
 from llama_index.core.schema import BaseNode, Document, TransformComponent
 from llama_index.core.storage import StorageContext
 
